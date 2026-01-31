@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { format, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, LogOut, User } from 'lucide-react';
+import { useUser, UserButton } from '@clerk/nextjs';
 import Calendar from '@/components/Calendar';
 import PeriodModal from '@/components/PeriodModal';
 import Statistics from '@/components/Statistics';
@@ -12,6 +13,7 @@ import { calculateCycleData } from '@/lib/calculations';
 import { PeriodEntry } from '@/types';
 
 export default function Home() {
+  const { user, isLoaded } = useUser();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [periods, setPeriods] = useState<PeriodEntry[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,12 +21,14 @@ export default function Home() {
   const [reminderDays, setReminderDays] = useState(3);
 
   useEffect(() => {
-    // Load data from localStorage
-    const loadedPeriods = storage.getPeriods();
-    const settings = storage.getSettings();
-    setPeriods(loadedPeriods);
-    setReminderDays(settings.reminderDaysBefore);
-  }, []);
+    // Load data from localStorage with user ID
+    if (isLoaded) {
+      const loadedPeriods = storage.getPeriods(user?.id);
+      const settings = storage.getSettings(user?.id);
+      setPeriods(loadedPeriods);
+      setReminderDays(settings.reminderDaysBefore);
+    }
+  }, [isLoaded, user?.id]);
 
   const cycleData = calculateCycleData(periods);
 
@@ -40,7 +44,7 @@ export default function Home() {
     };
     const updatedPeriods = [...periods, newEntry];
     setPeriods(updatedPeriods);
-    storage.savePeriods(updatedPeriods);
+    storage.savePeriods(updatedPeriods, user?.id);
   };
 
   const handlePreviousMonth = () => {
@@ -55,13 +59,36 @@ export default function Home() {
     setCurrentDate(new Date());
   };
 
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-blue-100 flex items-center justify-center">
+        <div className="text-2xl text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-100 to-blue-100">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 relative">
+          <div className="absolute top-0 right-0">
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: 'w-12 h-12',
+                },
+              }}
+              afterSignOutUrl="/sign-in"
+            />
+          </div>
           <h1 className="text-4xl font-bold text-gray-800 mb-2">Period Tracker</h1>
           <p className="text-gray-600">Track your cycle, predict ovulation, and stay informed</p>
+          {user && (
+            <p className="text-sm text-gray-500 mt-2">
+              Welcome, {user.firstName || user.emailAddresses[0].emailAddress}
+            </p>
+          )}
         </div>
 
         {/* Notifications */}
@@ -144,8 +171,8 @@ export default function Home() {
                 onChange={(e) => {
                   const value = parseInt(e.target.value);
                   setReminderDays(value);
-                  const settings = storage.getSettings();
-                  storage.saveSettings({ ...settings, reminderDaysBefore: value });
+                  const settings = storage.getSettings(user?.id);
+                  storage.saveSettings({ ...settings, reminderDaysBefore: value }, user?.id);
                 }}
                 className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-pink-500 focus:border-transparent"
               />
@@ -155,7 +182,8 @@ export default function Home() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-gray-600 text-sm">
-          <p>All data is stored locally in your browser</p>
+          <p>Your data is stored securely in your browser, linked to your account</p>
+          <p className="mt-1 text-xs">Protected by Clerk authentication</p>
         </div>
       </div>
 

@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+/screenshots/
+
+# Clerk setup scripts and temp files
+setup_clerk*.js
+clerk_*.png
+clerk_*.json
